@@ -1,0 +1,46 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  go: '1.22'
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - revive
+    - gofmt
+    - goimports
+    - misspell
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment  # Optional: can enable for memory optimization
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+        arguments:
+          - ["error", "Error"]
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/doki-stack/shared-go
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosimple
+  max-issues-per-linter: 0
+  max-same-issues: 0
