@@ -2,41 +2,68 @@
 
 Shared Go module for the Doki Stack platform. Provides foundational utilities used by all Go-based microservices.
 
-## Purpose
+## Packages
 
-This module contains the common patterns and utilities that every Go service in the Doki Stack platform depends on. It enforces consistency across services for error handling, logging, observability, and middleware.
+| Package | Import Path | Description |
+|---------|-------------|-------------|
+| config | `github.com/doki-stack/shared-go/config` | Environment loading, defaults, required vars, Vault integration |
+| envelope | `github.com/doki-stack/shared-go/envelope` | Standard JSON error format with `error_code`, `message`, `trace_id`, `org_id`, `retryable` |
+| logger | `github.com/doki-stack/shared-go/logger` | Zap-based structured logger with trace context and secret redaction |
+| otel | `github.com/doki-stack/shared-go/otel` | OpenTelemetry init (TracerProvider, MeterProvider) for Tempo and Prometheus |
+| middleware | `github.com/doki-stack/shared-go/middleware` | Chi middleware: org_id validation, request ID, logging, panic recovery |
+| breaker | `github.com/doki-stack/shared-go/breaker` | Circuit breaker using gobreaker |
+| ratelimit | `github.com/doki-stack/shared-go/ratelimit` | Token bucket rate limiter and middleware |
+| health | `github.com/doki-stack/shared-go/health` | `/healthz` and `/readyz` endpoints with pluggable checks |
+| httpclient | `github.com/doki-stack/shared-go/httpclient` | Retrying HTTP client with tracing, circuit breaker, org_id propagation |
 
-## Technology Stack
+## Quick Start
 
-| Component | Technology |
-|-----------|-----------|
-| Language | Go 1.22+ |
-| Logging | go.uber.org/zap |
-| Observability | go.opentelemetry.io/otel |
-| Circuit Breaker | github.com/sony/gobreaker |
-| Rate Limiting | golang.org/x/time/rate |
-| HTTP Client | net/http with retry and tracing |
+```go
+package main
 
-## What's Included
+import (
+    "context"
+    "net/http"
+    "time"
 
-- **Error Envelope** — Standard JSON error format with `error_code`, `message`, `trace_id`, `org_id`, `retryable`
-- **Structured Logger** — Zap-based logger with `trace_id`, `span_id`, `org_id`, `service`, `event_type`
-- **OTel SDK Init** — TracerProvider and MeterProvider setup for Tempo and Prometheus
-- **org_id Middleware** — chi middleware that extracts and validates `org_id` from headers
-- **Circuit Breaker** — Configurable circuit breaker using gobreaker
-- **Rate Limiter** — Token bucket rate limiter
-- **Health Check Handler** — Standard `/healthz` and `/readyz` endpoints
-- **HTTP Client** — Retrying HTTP client with timeout, tracing, and circuit breaker
+    "github.com/doki-stack/shared-go/health"
+    "github.com/doki-stack/shared-go/httpclient"
+    "github.com/doki-stack/shared-go/logger"
+    "github.com/doki-stack/shared-go/middleware"
+    "github.com/doki-stack/shared-go/otel"
+    "github.com/go-chi/chi/v5"
+)
 
-## Package
+func main() {
+    ctx := context.Background()
 
+    log, _ := logger.New("my-service")
+    _ = log
+
+    shutdown, _ := otel.Init(ctx, "my-service")
+    defer shutdown(ctx)
+
+    client := httpclient.New(
+        httpclient.WithTimeout(30*time.Second),
+        httpclient.WithRetries(3),
+    )
+    resp, err := client.Get(middleware.ContextWithOrgID(ctx, "org-123"), "https://api.example.com/data")
+    if err == nil {
+        defer resp.Body.Close()
+    }
+
+    r := chi.NewRouter()
+    r.Use(middleware.OrgID)
+    r.Mount("/health", health.Handler())
+    http.ListenAndServe(":8080", r)
+}
 ```
+
+## Install
+
+```bash
 go get github.com/doki-stack/shared-go
 ```
-
-## Implementation Phase
-
-**Phase 0** — Foundation. This is one of the first repositories built as all Go services depend on it.
 
 ## License
 
